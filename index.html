@@ -1,0 +1,1757 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mugam cup e-sport</title>
+<style>
+body{font-family:system-ui,sans-serif;background:#14161c;color:#e8e8ee;margin:0;padding:20px}
+h1{margin:0 0 4px;font-size:22px}
+h3{margin:0 0 10px;font-size:16px}
+.sub{color:#8a8fa0;font-size:12px;margin-bottom:14px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.tab{background:#2a2e38}
+.tab.active{background:#ff4655}
+.panel{display:none}
+.panel.active{display:block}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.card{background:#1e2129;border-radius:10px;padding:14px;margin-bottom:16px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+td,th{padding:6px;border-bottom:1px solid #2a2e38;text-align:left;vertical-align:middle}
+button{background:#ff4655;color:#fff;border:0;border-radius:6px;padding:7px 12px;cursor:pointer;margin:2px}
+button.alt{background:#3a3f4c}
+button:disabled{opacity:.4;cursor:default}
+select,textarea{padding:6px;border-radius:6px;background:#2a2e38;color:#fff;border:0;margin:4px 0}
+textarea{width:100%;box-sizing:border-box;min-height:70px;font-family:inherit}
+#log{font-family:monospace;font-size:12px;white-space:pre-wrap;max-height:260px;overflow:auto;background:#101216;padding:8px;border-radius:6px}
+#msg{color:#ffb86b;min-height:18px;font-size:13px;margin-top:8px}
+.hint{color:#8a8fa0;font-size:12px}
+.fit{font-weight:bold}
+.good{color:#5fd38d}.mid{color:#ffb86b}.bad{color:#ff6b6b}
+canvas{width:100%;max-width:960px;background:#5a6172;border-radius:8px;touch-action:none;cursor:grab}
+@media(max-width:800px){.grid2{grid-template-columns:1fr}}
+</style>
+<style>.coach{padding:6px 8px;margin:4px 0;border-left:3px solid #5fd38d;background:#1d2029;border-radius:4px}.coach.warn{border-color:#ffd166}.coach.leave{border-color:#ff4655}.coach.defense,.coach.tactic,.coach.lurk{border-color:#5aa0ff}</style>
+</head>
+<body>
+<h1>Mugam cup e-sport</h1>
+<div class="sub">Tamamilə orijinal agentlər, xəritələr və oyunçular. Bu layihənin Riot Games ilə əlaqəsi yoxdur.</div>
+<div class="hint">Büdcə: <b id="budget"></b> · Həftə: <b id="week"></b></div>
+
+<div class="tabs">
+  <button class="tab active" data-tab="team">Komanda</button>
+  <button class="tab" data-tab="assign">Rol və agent</button>
+  <button class="tab" data-tab="tactics">Taktika</button>
+  <button class="tab" data-tab="match">Matç və cədvəl</button>
+  <button class="tab" data-tab="coach">Assistant Coach <span id="unread"></span></button>
+</div>
+
+<section class="panel active" id="p-team">
+  <div class="card" id="pickCard">
+    <h3>Komanda seçin</h3>
+    <p class="hint">Oyuna başlamaq üçün bir komanda seçin. 5 oyunçusu olmayan komandalar hələlik seçilə bilməz. Mövsüm başladıqdan sonra komanda dəyişmək olmur.</p>
+    <table id="pick"></table>
+  </div>
+  <div class="grid2" id="teamCard" style="display:none">
+    <div class="card">
+      <h3>Komandanız: <span id="myteamname"></span></h3>
+      <table id="roster"></table>
+    </div>
+    <div class="card">
+      <h3>Oyunçu axtarışı</h3>
+      <input id="search" placeholder="Oyunçu adı yazın..." style="width:100%;box-sizing:border-box;padding:6px;border-radius:6px;background:#2a2e38;color:#fff;border:0;margin-bottom:8px">
+      <table id="results"></table>
+      <p class="hint">Komandanızda 5 oyunçu var. Başqa oyunçu almaq üçün əvvəl öz oyunçunuzu satın.</p>
+    </div>
+  </div>
+</section>
+
+<section class="panel" id="p-assign">
+  <div class="card">
+    <h3>Rol və agent təyini</h3>
+    <div>Komanda uyğunluğu: <b id="teamfit"></b></div>
+    <table id="assign"></table>
+    <p class="hint">Oyunçunun öz rolu ilə təyin etdiyiniz rol üst-üstə düşmürsə, və ya agent təyin olunmuş rola uyğun deyilsə, uyğunluq faizi düşür.</p>
+  </div>
+  <div class="card">
+    <h3>Agentlər</h3>
+    <table id="agents"></table>
+  </div>
+</section>
+
+<section class="panel" id="p-tactics">
+  <div class="card">
+    <h3>Taktika lövhəsi</h3>
+    <div>Xəritə: <select id="tmap"></select>
+      Tərəf: <select id="side"><option value="attack">Hücum (Attack)</option><option value="defense">Müdafiə (Defans)</option></select></div>
+    <canvas id="board" width="960" height="600"></canvas>
+    <p class="hint">Yaşıl zona hücum başlanğıcıdır, göy zona müdafiə başlanğıcıdır. Sarı zona Mid-dir (A və B arasında yeganə keçid). Oyunçular yalnız açıq yollarla hərəkət edə bilər. Bu lövhə planlaşdırma üçündür, matçın nəticəsinə təsiri yoxdur.</p>
+    <div>Taktika qeydləri:</div>
+    <textarea id="note" placeholder="Məsələn: Mid-dən A linkinə keçid, B tərəfə 2 nəfərlə hücum..."></textarea>
+    <p>
+      <button id="saveNote">Qeydi saxla</button>
+      <button class="alt" id="resetPos">Mövqeləri sıfırla</button>
+    </p>
+  </div>
+  <div class="card">
+    <h3>Müdafiə planı</h3>
+    <p class="hint" id="zonehint"></p>
+    <div id="defcheck"></div>
+    <p class="hint">Müdafiə oyunçuları lövhədə Defans tərəfində yerləşdirilir. Sitedə tək qalan oyunçu yalnız controller ola bilər. Middə heç kim yoxdursa komanda roundların 1/5-ni uduzur.</p>
+  </div>
+</section>
+
+<section class="panel" id="p-match">
+  <div class="grid2">
+    <div class="card">
+      <h3>Növbəti matç</h3>
+      <div>Rəqib: <b id="opp"></b></div>
+      <div>Xəritə: <select id="map"></select></div>
+      <div>Hücum taktikası (lövhədən): <b id="tacticInfo"></b></div>
+      <p><button id="play">Matçı oyna</button> <button class="alt" id="reset">Yeni oyun</button></p>
+      <div id="msg"></div>
+    </div>
+    <div class="card">
+      <h3>Cədvəl</h3>
+      <table id="table"></table>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Matç jurnalı</h3>
+    <div id="log">Hələ matç oynanmayıb.</div>
+  </div>
+</section>
+
+<section class="panel" id="p-coach">
+  <div class="card">
+    <h3>Assistant Coach bildirişləri</h3>
+    <div id="coachlist"></div>
+  </div>
+</section>
+
+<script>
+// ===== Məlumat =====
+const ROLES = ["Duelist","Controller","Sentinel","Initiator"];
+const AGENTS = [
+  {name:"Blaze Kane",   role:"Duelist",    key:"aim",      ability:"Ember Dash: qısa məsafəyə sürətli hücum"},
+  {name:"Sable Ion",    role:"Duelist",    key:"aim",      ability:"Ion Blink: qısa anlıq görünməzlik"},
+  {name:"Nyx Vale",     role:"Controller", key:"sense",    ability:"Smoke Wall: xətt boyunca tüstü divarı"},
+  {name:"Tide Marrow",  role:"Controller", key:"sense",    ability:"Flood Zone: sahəni yavaşladan su"},
+  {name:"Bastion Mott", role:"Sentinel",   key:"teamwork", ability:"Shield Dome: qısa müdafiə qalxanı"},
+  {name:"Iron Orra",    role:"Sentinel",   key:"teamwork", ability:"Tripwire: yerə qoyulan tuzaq"},
+  {name:"Pax Rune",     role:"Initiator",  key:"sense",    ability:"Scan Drone: düşmənləri aşkar edir"},
+  {name:"Echo Lumen",   role:"Initiator",  key:"teamwork", ability:"Echo Flash: komandanı qısa müddətə kor edir"}
+];
+
+// Hər xəritə üçün qaydalar: floor (gəzilə bilən), mid (A və B arasında yeganə keçid), attack/defense başlanğıcı, sites
+const MAPS = [
+ {
+  "name": "Qala Keçidi",
+  "atk": 1,
+  "def": 1.02,
+  "attack": {
+   "x": 0.375,
+   "y": 0.8571428571428571,
+   "w": 0.25,
+   "h": 0.14285714285714285
+  },
+  "defense": {
+   "x": 0.375,
+   "y": 0,
+   "w": 0.25,
+   "h": 0.21428571428571427
+  },
+  "sites": [
+   {
+    "name": "A",
+    "x": 0.041666666666666664,
+    "y": 0.35714285714285715,
+    "w": 0.25,
+    "h": 0.2857142857142857
+   },
+   {
+    "name": "B",
+    "x": 0.75,
+    "y": 0.35714285714285715,
+    "w": 0.20833333333333334,
+    "h": 0.2857142857142857
+   }
+  ],
+  "mid": [
+   {
+    "x": 0.375,
+    "y": 0.21428571428571427,
+    "w": 0.25,
+    "h": 0.21428571428571427
+   },
+   {
+    "x": 0.625,
+    "y": 0.35714285714285715,
+    "w": 0.041666666666666664,
+    "h": 0.2857142857142857
+   },
+   {
+    "x": 0.375,
+    "y": 0.5714285714285714,
+    "w": 0.25,
+    "h": 0.21428571428571427
+   }
+  ],
+  "floor": [
+   {
+    "x": 0.375,
+    "y": 0,
+    "w": 0.25,
+    "h": 0.42857142857142855
+   },
+   {
+    "x": 0.125,
+    "y": 0.14285714285714285,
+    "w": 0.25,
+    "h": 0.5
+   },
+   {
+    "x": 0.625,
+    "y": 0.14285714285714285,
+    "w": 0.25,
+    "h": 0.5
+   },
+   {
+    "x": 0.041666666666666664,
+    "y": 0.35714285714285715,
+    "w": 0.08333333333333333,
+    "h": 0.35714285714285715
+   },
+   {
+    "x": 0.875,
+    "y": 0.35714285714285715,
+    "w": 0.08333333333333333,
+    "h": 0.2857142857142857
+   },
+   {
+    "x": 0.375,
+    "y": 0.5714285714285714,
+    "w": 0.25,
+    "h": 0.42857142857142855
+   },
+   {
+    "x": 0.125,
+    "y": 0.6428571428571429,
+    "w": 0.125,
+    "h": 0.2857142857142857
+   },
+   {
+    "x": 0.7083333333333334,
+    "y": 0.6428571428571429,
+    "w": 0.16666666666666666,
+    "h": 0.35714285714285715
+   },
+   {
+    "x": 0.08333333333333333,
+    "y": 0.7142857142857143,
+    "w": 0.041666666666666664,
+    "h": 0.21428571428571427
+   },
+   {
+    "x": 0.25,
+    "y": 0.7142857142857143,
+    "w": 0.08333333333333333,
+    "h": 0.21428571428571427
+   },
+   {
+    "x": 0.625,
+    "y": 0.7142857142857143,
+    "w": 0.08333333333333333,
+    "h": 0.2857142857142857
+   },
+   {
+    "x": 0.875,
+    "y": 0.7142857142857143,
+    "w": 0.041666666666666664,
+    "h": 0.2857142857142857
+   },
+   {
+    "x": 0.3333333333333333,
+    "y": 0.8571428571428571,
+    "w": 0.041666666666666664,
+    "h": 0.14285714285714285
+   }
+  ],
+  "callouts": [
+   {
+    "n": "Mid Top",
+    "x": 0.5,
+    "y": 0.2857142857142857
+   },
+   {
+    "n": "A Def Route",
+    "x": 0.25,
+    "y": 0.25
+   },
+   {
+    "n": "B Def Route",
+    "x": 0.75,
+    "y": 0.25
+   },
+   {
+    "n": "A Site",
+    "x": 0.16666666666666666,
+    "y": 0.5
+   },
+   {
+    "n": "A Link",
+    "x": 0.3333333333333333,
+    "y": 0.5
+   },
+   {
+    "n": "Mid Core",
+    "x": 0.5208333333333334,
+    "y": 0.5
+   },
+   {
+    "n": "B Link",
+    "x": 0.7083333333333334,
+    "y": 0.5
+   },
+   {
+    "n": "B Site",
+    "x": 0.8541666666666666,
+    "y": 0.5
+   },
+   {
+    "n": "Mid Bottom",
+    "x": 0.5,
+    "y": 0.7142857142857143
+   },
+   {
+    "n": "Mid Entrance",
+    "x": 0.5,
+    "y": 0.8214285714285714
+   },
+   {
+    "n": "A Main",
+    "x": 0.14583333333333334,
+    "y": 0.6785714285714286
+   },
+   {
+    "n": "A Lobby",
+    "x": 0.20833333333333334,
+    "y": 0.8214285714285714
+   },
+   {
+    "n": "A Entry",
+    "x": 0.3541666666666667,
+    "y": 0.9285714285714286
+   },
+   {
+    "n": "B Main",
+    "x": 0.7916666666666666,
+    "y": 0.6785714285714286
+   },
+   {
+    "n": "B Lobby",
+    "x": 0.7708333333333334,
+    "y": 0.8571428571428571
+   }
+  ],
+  "place": {
+   "attack": [
+    {
+     "name": "A Lobby",
+     "x": 0.08333333333333333,
+     "y": 0.7142857142857143,
+     "w": 0.25,
+     "h": 0.21428571428571427
+    },
+    {
+     "name": "Mid Bottom",
+     "x": 0.375,
+     "y": 0.6428571428571429,
+     "w": 0.25,
+     "h": 0.14285714285714285
+    },
+    {
+     "name": "B Lobby",
+     "x": 0.625,
+     "y": 0.7142857142857143,
+     "w": 0.2916666666666667,
+     "h": 0.2857142857142857
+    }
+   ],
+   "defense": [
+    {
+     "name": "Mid Top",
+     "x": 0.375,
+     "y": 0.21428571428571427,
+     "w": 0.25,
+     "h": 0.14285714285714285
+    },
+    {
+     "name": "A Site",
+     "x": 0.041666666666666664,
+     "y": 0.35714285714285715,
+     "w": 0.25,
+     "h": 0.2857142857142857
+    },
+    {
+     "name": "B Site",
+     "x": 0.75,
+     "y": 0.35714285714285715,
+     "w": 0.20833333333333334,
+     "h": 0.2857142857142857
+    }
+   ]
+  }
+ },
+ {
+  "name": "Dağ Yolu",
+  "atk": 1,
+  "def": 1.02,
+  "attack": {
+   "x": 0,
+   "y": 0.35714285714285715,
+   "w": 0.125,
+   "h": 0.2857142857142857
+  },
+  "defense": {
+   "x": 0.875,
+   "y": 0.35714285714285715,
+   "w": 0.125,
+   "h": 0.2857142857142857
+  },
+  "sites": [
+   {
+    "name": "A",
+    "x": 0.625,
+    "y": 0,
+    "w": 0.25,
+    "h": 0.2857142857142857
+   },
+   {
+    "name": "B",
+    "x": 0.5416666666666666,
+    "y": 0.6428571428571429,
+    "w": 0.25,
+    "h": 0.35714285714285715
+   }
+  ],
+  "mid": [
+   {
+    "x": 0.375,
+    "y": 0.42857142857142855,
+    "w": 0.041666666666666664,
+    "h": 0.21428571428571427
+   },
+   {
+    "x": 0.5833333333333334,
+    "y": 0.42857142857142855,
+    "w": 0.041666666666666664,
+    "h": 0.21428571428571427
+   },
+   {
+    "x": 0.4166666666666667,
+    "y": 0.6428571428571429,
+    "w": 0.125,
+    "h": 0.14285714285714285
+   }
+  ],
+  "floor": [
+   {
+    "x": 0.625,
+    "y": 0,
+    "w": 0.25,
+    "h": 0.2857142857142857
+   },
+   {
+    "x": 0.4166666666666667,
+    "y": 0.07142857142857142,
+    "w": 0.20833333333333334,
+    "h": 0.21428571428571427
+   },
+   {
+    "x": 0.25,
+    "y": 0.14285714285714285,
+    "w": 0.16666666666666666,
+    "h": 0.21428571428571427
+   },
+   {
+    "x": 0.125,
+    "y": 0.2857142857142857,
+    "w": 0.125,
+    "h": 0.42857142857142855
+   },
+   {
+    "x": 0.4583333333333333,
+    "y": 0.2857142857142857,
+    "w": 0.125,
+    "h": 0.14285714285714285
+   },
+   {
+    "x": 0.75,
+    "y": 0.2857142857142857,
+    "w": 0.125,
+    "h": 0.2857142857142857
+   },
+   {
+    "x": 0,
+    "y": 0.35714285714285715,
+    "w": 0.125,
+    "h": 0.2857142857142857
+   },
+   {
+    "x": 0.875,
+    "y": 0.35714285714285715,
+    "w": 0.125,
+    "h": 0.5
+   },
+   {
+    "x": 0.25,
+    "y": 0.42857142857142855,
+    "w": 0.16666666666666666,
+    "h": 0.14285714285714285
+   },
+   {
+    "x": 0.5833333333333334,
+    "y": 0.42857142857142855,
+    "w": 0.16666666666666666,
+    "h": 0.5714285714285714
+   },
+   {
+    "x": 0.375,
+    "y": 0.5714285714285714,
+    "w": 0.041666666666666664,
+    "h": 0.07142857142857142
+   },
+   {
+    "x": 0.4166666666666667,
+    "y": 0.6428571428571429,
+    "w": 0.16666666666666666,
+    "h": 0.35714285714285715
+   },
+   {
+    "x": 0.75,
+    "y": 0.6428571428571429,
+    "w": 0.125,
+    "h": 0.21428571428571427
+   },
+   {
+    "x": 0.16666666666666666,
+    "y": 0.7142857142857143,
+    "w": 0.16666666666666666,
+    "h": 0.21428571428571427
+   },
+   {
+    "x": 0.3333333333333333,
+    "y": 0.7857142857142857,
+    "w": 0.08333333333333333,
+    "h": 0.21428571428571427
+   },
+   {
+    "x": 0.75,
+    "y": 0.8571428571428571,
+    "w": 0.041666666666666664,
+    "h": 0.14285714285714285
+   }
+  ],
+  "callouts": [
+   {
+    "n": "T Lobby",
+    "x": 0.1875,
+    "y": 0.5
+   },
+   {
+    "n": "A Main",
+    "x": 0.3333333333333333,
+    "y": 0.25
+   },
+   {
+    "n": "A Long",
+    "x": 0.5208333333333334,
+    "y": 0.17857142857142858
+   },
+   {
+    "n": "A Site",
+    "x": 0.75,
+    "y": 0.14285714285714285
+   },
+   {
+    "n": "A Link",
+    "x": 0.5208333333333334,
+    "y": 0.35714285714285715
+   },
+   {
+    "n": "Mid Core",
+    "x": 0.5,
+    "y": 0.5357142857142857
+   },
+   {
+    "n": "Mid West",
+    "x": 0.3125,
+    "y": 0.5
+   },
+   {
+    "n": "Mid East",
+    "x": 0.6875,
+    "y": 0.5357142857142857
+   },
+   {
+    "n": "Mid South",
+    "x": 0.4791666666666667,
+    "y": 0.7142857142857143
+   },
+   {
+    "n": "B Main",
+    "x": 0.25,
+    "y": 0.8214285714285714
+   },
+   {
+    "n": "B Long",
+    "x": 0.4375,
+    "y": 0.8928571428571429
+   },
+   {
+    "n": "B Site",
+    "x": 0.6666666666666666,
+    "y": 0.8214285714285714
+   },
+   {
+    "n": "D Lobby",
+    "x": 0.8125,
+    "y": 0.42857142857142855
+   },
+   {
+    "n": "D South",
+    "x": 0.8333333333333334,
+    "y": 0.75
+   },
+   {
+    "n": "D South 2",
+    "x": 0.9375,
+    "y": 0.75
+   }
+  ],
+  "place": {
+   "attack": [
+    {
+     "name": "Mid West",
+     "x": 0.25,
+     "y": 0.42857142857142855,
+     "w": 0.125,
+     "h": 0.14285714285714285
+    },
+    {
+     "name": "A Main",
+     "x": 0.25,
+     "y": 0.14285714285714285,
+     "w": 0.16666666666666666,
+     "h": 0.21428571428571427
+    },
+    {
+     "name": "B Main",
+     "x": 0.16666666666666666,
+     "y": 0.7142857142857143,
+     "w": 0.16666666666666666,
+     "h": 0.21428571428571427
+    }
+   ],
+   "defense": [
+    {
+     "name": "Mid East",
+     "x": 0.625,
+     "y": 0.42857142857142855,
+     "w": 0.125,
+     "h": 0.21428571428571427
+    },
+    {
+     "name": "A Site",
+     "x": 0.625,
+     "y": 0,
+     "w": 0.25,
+     "h": 0.2857142857142857
+    },
+    {
+     "name": "B Site",
+     "x": 0.5416666666666666,
+     "y": 0.6428571428571429,
+     "w": 0.25,
+     "h": 0.35714285714285715
+    }
+   ]
+  }
+ },
+ {
+  "name": "Kəhrəba Limanı",
+  "atk": 1.03,
+  "def": 0.99,
+  "attack": {
+   "x": 0.041666666666666664,
+   "y": 0.5714285714285714,
+   "w": 0.125,
+   "h": 0.2857142857142857
+  },
+  "defense": {
+   "x": 0.875,
+   "y": 0.07142857142857142,
+   "w": 0.125,
+   "h": 0.2857142857142857
+  },
+  "sites": [
+   {
+    "name": "B",
+    "x": 0.041666666666666664,
+    "y": 0,
+    "w": 0.20833333333333334,
+    "h": 0.2857142857142857
+   },
+   {
+    "name": "A",
+    "x": 0.5833333333333334,
+    "y": 0.6428571428571429,
+    "w": 0.25,
+    "h": 0.35714285714285715
+   }
+  ],
+  "mid": [
+   {
+    "x": 0.3333333333333333,
+    "y": 0.2857142857142857,
+    "w": 0.08333333333333333,
+    "h": 0.42857142857142855
+   },
+   {
+    "x": 0.5416666666666666,
+    "y": 0.2857142857142857,
+    "w": 0.08333333333333333,
+    "h": 0.07142857142857142
+   },
+   {
+    "x": 0.4166666666666667,
+    "y": 0.35714285714285715,
+    "w": 0.08333333333333333,
+    "h": 0.35714285714285715
+   },
+   {
+    "x": 0.5833333333333334,
+    "y": 0.35714285714285715,
+    "w": 0.041666666666666664,
+    "h": 0.21428571428571427
+   },
+   {
+    "x": 0.5,
+    "y": 0.42857142857142855,
+    "w": 0.08333333333333333,
+    "h": 0.14285714285714285
+   }
+  ],
+  "floor": [
+   {
+    "x": 0.041666666666666664,
+    "y": 0,
+    "w": 0.20833333333333334,
+    "h": 0.2857142857142857
+   },
+   {
+    "x": 0.7083333333333334,
+    "y": 0,
+    "w": 0.16666666666666666,
+    "h": 0.2857142857142857
+   },
+   {
+    "x": 0.875,
+    "y": 0.07142857142857142,
+    "w": 0.125,
+    "h": 0.2857142857142857
+   },
+   {
+    "x": 0.625,
+    "y": 0.21428571428571427,
+    "w": 0.08333333333333333,
+    "h": 0.2857142857142857
+   },
+   {
+    "x": 0.08333333333333333,
+    "y": 0.2857142857142857,
+    "w": 0.125,
+    "h": 0.14285714285714285
+   },
+   {
+    "x": 0.3333333333333333,
+    "y": 0.2857142857142857,
+    "w": 0.08333333333333333,
+    "h": 0.6428571428571429
+   },
+   {
+    "x": 0.5416666666666666,
+    "y": 0.2857142857142857,
+    "w": 0.08333333333333333,
+    "h": 0.07142857142857142
+   },
+   {
+    "x": 0.7916666666666666,
+    "y": 0.2857142857142857,
+    "w": 0.08333333333333333,
+    "h": 0.35714285714285715
+   },
+   {
+    "x": 0.20833333333333334,
+    "y": 0.35714285714285715,
+    "w": 0.125,
+    "h": 0.14285714285714285
+   },
+   {
+    "x": 0.4166666666666667,
+    "y": 0.35714285714285715,
+    "w": 0.08333333333333333,
+    "h": 0.5714285714285714
+   },
+   {
+    "x": 0.5833333333333334,
+    "y": 0.35714285714285715,
+    "w": 0.041666666666666664,
+    "h": 0.21428571428571427
+   },
+   {
+    "x": 0.5,
+    "y": 0.42857142857142855,
+    "w": 0.08333333333333333,
+    "h": 0.14285714285714285
+   },
+   {
+    "x": 0.16666666666666666,
+    "y": 0.5,
+    "w": 0.125,
+    "h": 0.42857142857142855
+   },
+   {
+    "x": 0.041666666666666664,
+    "y": 0.5714285714285714,
+    "w": 0.125,
+    "h": 0.2857142857142857
+   },
+   {
+    "x": 0.5833333333333334,
+    "y": 0.6428571428571429,
+    "w": 0.25,
+    "h": 0.35714285714285715
+   },
+   {
+    "x": 0.2916666666666667,
+    "y": 0.7142857142857143,
+    "w": 0.041666666666666664,
+    "h": 0.21428571428571427
+   },
+   {
+    "x": 0.5,
+    "y": 0.7142857142857143,
+    "w": 0.08333333333333333,
+    "h": 0.21428571428571427
+   }
+  ],
+  "callouts": [
+   {
+    "n": "T Lobby",
+    "x": 0.22916666666666666,
+    "y": 0.7142857142857143
+   },
+   {
+    "n": "Mid West",
+    "x": 0.2708333333333333,
+    "y": 0.42857142857142855
+   },
+   {
+    "n": "B Main",
+    "x": 0.14583333333333334,
+    "y": 0.35714285714285715
+   },
+   {
+    "n": "B Site",
+    "x": 0.14583333333333334,
+    "y": 0.14285714285714285
+   },
+   {
+    "n": "Mid Core",
+    "x": 0.4791666666666667,
+    "y": 0.42857142857142855
+   },
+   {
+    "n": "Mid South",
+    "x": 0.4166666666666667,
+    "y": 0.6428571428571429
+   },
+   {
+    "n": "A Dock",
+    "x": 0.3958333333333333,
+    "y": 0.8214285714285714
+   },
+   {
+    "n": "A Connector",
+    "x": 0.5416666666666666,
+    "y": 0.8214285714285714
+   },
+   {
+    "n": "A Site",
+    "x": 0.7083333333333334,
+    "y": 0.8214285714285714
+   },
+   {
+    "n": "Mid East",
+    "x": 0.6666666666666666,
+    "y": 0.35714285714285715
+   },
+   {
+    "n": "D Lobby",
+    "x": 0.7916666666666666,
+    "y": 0.14285714285714285
+   },
+   {
+    "n": "D Lane",
+    "x": 0.8333333333333334,
+    "y": 0.4642857142857143
+   }
+  ],
+  "place": {
+   "attack": [
+    {
+     "name": "Mid West",
+     "x": 0.20833333333333334,
+     "y": 0.35714285714285715,
+     "w": 0.125,
+     "h": 0.14285714285714285
+    },
+    {
+     "name": "A Dock",
+     "x": 0.2916666666666667,
+     "y": 0.7142857142857143,
+     "w": 0.20833333333333334,
+     "h": 0.21428571428571427
+    },
+    {
+     "name": "B Main",
+     "x": 0.08333333333333333,
+     "y": 0.2857142857142857,
+     "w": 0.125,
+     "h": 0.14285714285714285
+    }
+   ],
+   "defense": [
+    {
+     "name": "Mid East",
+     "x": 0.625,
+     "y": 0.21428571428571427,
+     "w": 0.08333333333333333,
+     "h": 0.2857142857142857
+    },
+    {
+     "name": "A Site",
+     "x": 0.5833333333333334,
+     "y": 0.6428571428571429,
+     "w": 0.25,
+     "h": 0.35714285714285715
+    },
+    {
+     "name": "B Site",
+     "x": 0.041666666666666664,
+     "y": 0,
+     "w": 0.20833333333333334,
+     "h": 0.2857142857142857
+    }
+   ]
+  }
+ },
+ {
+  "name": "Sınıq Körpü",
+  "atk": 1,
+  "def": 1,
+  "attack": {
+   "x": 0,
+   "y": 0,
+   "w": 0.125,
+   "h": 0.2857142857142857
+  },
+  "defense": {
+   "x": 0.875,
+   "y": 0.5714285714285714,
+   "w": 0.125,
+   "h": 0.2857142857142857
+  },
+  "sites": [
+   {
+    "name": "A",
+    "x": 0.625,
+    "y": 0,
+    "w": 0.25,
+    "h": 0.2857142857142857
+   },
+   {
+    "name": "B",
+    "x": 0,
+    "y": 0.6428571428571429,
+    "w": 0.20833333333333334,
+    "h": 0.2857142857142857
+   }
+  ],
+  "mid": [
+   {
+    "x": 0.375,
+    "y": 0.42857142857142855,
+    "w": 0.2916666666666667,
+    "h": 0.14285714285714285
+   },
+   {
+    "x": 0.375,
+    "y": 0.5714285714285714,
+    "w": 0.16666666666666666,
+    "h": 0.14285714285714285
+   }
+  ],
+  "floor": [
+   {
+    "x": 0,
+    "y": 0,
+    "w": 0.125,
+    "h": 0.2857142857142857
+   },
+   {
+    "x": 0.25,
+    "y": 0,
+    "w": 0.625,
+    "h": 0.21428571428571427
+   },
+   {
+    "x": 0.125,
+    "y": 0.07142857142857142,
+    "w": 0.125,
+    "h": 0.21428571428571427
+   },
+   {
+    "x": 0.625,
+    "y": 0.21428571428571427,
+    "w": 0.25,
+    "h": 0.07142857142857142
+   },
+   {
+    "x": 0.20833333333333334,
+    "y": 0.2857142857142857,
+    "w": 0.16666666666666666,
+    "h": 0.42857142857142855
+   },
+   {
+    "x": 0.6666666666666666,
+    "y": 0.2857142857142857,
+    "w": 0.125,
+    "h": 0.2857142857142857
+   },
+   {
+    "x": 0.375,
+    "y": 0.42857142857142855,
+    "w": 0.2916666666666667,
+    "h": 0.14285714285714285
+   },
+   {
+    "x": 0.7916666666666666,
+    "y": 0.42857142857142855,
+    "w": 0.08333333333333333,
+    "h": 0.42857142857142855
+   },
+   {
+    "x": 0.375,
+    "y": 0.5714285714285714,
+    "w": 0.16666666666666666,
+    "h": 0.14285714285714285
+   },
+   {
+    "x": 0.875,
+    "y": 0.5714285714285714,
+    "w": 0.125,
+    "h": 0.2857142857142857
+   },
+   {
+    "x": 0,
+    "y": 0.6428571428571429,
+    "w": 0.20833333333333334,
+    "h": 0.2857142857142857
+   },
+   {
+    "x": 0.5,
+    "y": 0.7142857142857143,
+    "w": 0.2916666666666667,
+    "h": 0.21428571428571427
+   }
+  ],
+  "callouts": [
+   {
+    "n": "T Lobby",
+    "x": 0.1875,
+    "y": 0.17857142857142858
+   },
+   {
+    "n": "A Main",
+    "x": 0.3541666666666667,
+    "y": 0.10714285714285714
+   },
+   {
+    "n": "A Long",
+    "x": 0.5416666666666666,
+    "y": 0.10714285714285714
+   },
+   {
+    "n": "A Site",
+    "x": 0.75,
+    "y": 0.14285714285714285
+   },
+   {
+    "n": "A Stairs",
+    "x": 0.7291666666666666,
+    "y": 0.35714285714285715
+   },
+   {
+    "n": "Mid West",
+    "x": 0.2916666666666667,
+    "y": 0.42857142857142855
+   },
+   {
+    "n": "Mid Bridge",
+    "x": 0.5208333333333334,
+    "y": 0.5
+   },
+   {
+    "n": "Mid East",
+    "x": 0.7291666666666666,
+    "y": 0.5
+   },
+   {
+    "n": "B Main",
+    "x": 0.2916666666666667,
+    "y": 0.6428571428571429
+   },
+   {
+    "n": "B Site",
+    "x": 0.10416666666666667,
+    "y": 0.7857142857142857
+   },
+   {
+    "n": "Low Mid",
+    "x": 0.4583333333333333,
+    "y": 0.6428571428571429
+   },
+   {
+    "n": "Low Road",
+    "x": 0.6458333333333334,
+    "y": 0.8214285714285714
+   },
+   {
+    "n": "D Lobby",
+    "x": 0.8333333333333334,
+    "y": 0.6428571428571429
+   }
+  ],
+  "place": {
+   "attack": [
+    {
+     "name": "Mid West",
+     "x": 0.20833333333333334,
+     "y": 0.2857142857142857,
+     "w": 0.16666666666666666,
+     "h": 0.2857142857142857
+    },
+    {
+     "name": "A Main",
+     "x": 0.25,
+     "y": 0,
+     "w": 0.20833333333333334,
+     "h": 0.21428571428571427
+    },
+    {
+     "name": "B Main",
+     "x": 0.20833333333333334,
+     "y": 0.5714285714285714,
+     "w": 0.16666666666666666,
+     "h": 0.14285714285714285
+    }
+   ],
+   "defense": [
+    {
+     "name": "Mid East",
+     "x": 0.6666666666666666,
+     "y": 0.42857142857142855,
+     "w": 0.125,
+     "h": 0.14285714285714285
+    },
+    {
+     "name": "A Site",
+     "x": 0.625,
+     "y": 0,
+     "w": 0.25,
+     "h": 0.2857142857142857
+    },
+    {
+     "name": "B Site",
+     "x": 0,
+     "y": 0.6428571428571429,
+     "w": 0.20833333333333334,
+     "h": 0.2857142857142857
+    }
+   ]
+  }
+ }
+];
+
+
+const TACTICS = {balanced:[1,1,1], aggressive:[1.1,0.9,1.0], defensive:[0.9,1.1,1.05]};
+
+// Liqa oyunçuları (cədvəldən). kd = baza K/D, qiymət və qələbə şansı buna görə hesablanır.
+const LEAGUE = [{"name":"Extasy","pref":"Duelist","alt":null,"tier":"league","team":"DPR","kd":1.11,"aim":92,"sense":93,"teamwork":54},{"name":"Aidd","pref":"Duelist","alt":null,"tier":"league","team":"Trayb","kd":1.1,"aim":93,"sense":93,"teamwork":55},{"name":"nihad","pref":"Duelist","alt":null,"tier":"league","team":"Low9","kd":1.12,"aim":90,"sense":86,"teamwork":75},{"name":"Holly","pref":"Duelist","alt":null,"tier":"league","team":"MYTH","kd":1.05,"aim":88,"sense":73,"teamwork":67},{"name":"Atalant","pref":"Duelist","alt":null,"tier":"league","team":"Low9","kd":1.08,"aim":87,"sense":88,"teamwork":79},{"name":"some1likeyou","pref":"Duelist","alt":null,"tier":"league","team":"Zero Call","kd":1.04,"aim":83,"sense":83,"teamwork":52},{"name":"ERVL","pref":"Controller","alt":null,"tier":"league","team":"MYTH","kd":1.15,"aim":89,"sense":85,"teamwork":87},{"name":"Shone","pref":"Initiator","alt":null,"tier":"league","team":"MYTH","kd":1.14,"aim":81,"sense":69,"teamwork":73},{"name":"Muxtarov","pref":"Sentinel","alt":null,"tier":"league","team":"Revengers","kd":1.05,"aim":84,"sense":83,"teamwork":59},{"name":"z1y4","pref":"Sentinel","alt":null,"tier":"league","team":"Low9","kd":1.03,"aim":78,"sense":74,"teamwork":61},{"name":"Deeve","pref":"Initiator","alt":null,"tier":"league","team":"Zero Call","kd":1.02,"aim":78,"sense":80,"teamwork":69},{"name":"Asura","pref":"Initiator","alt":null,"tier":"league","team":"DPR","kd":1.08,"aim":72,"sense":77,"teamwork":75},{"name":"tarnished","pref":"Initiator","alt":null,"tier":"league","team":"Revengers","kd":0.98,"aim":80,"sense":80,"teamwork":74},{"name":"280km peek","pref":"Controller","alt":null,"tier":"league","team":"Low9","kd":1.01,"aim":69,"sense":64,"teamwork":88},{"name":"Akif","pref":"Controller","alt":null,"tier":"league","team":"Protocol 9","kd":1.09,"aim":86,"sense":90,"teamwork":86},{"name":"ZohrabPekaka","pref":"Controller","alt":null,"tier":"league","team":"Trayb","kd":1.09,"aim":77,"sense":70,"teamwork":90},{"name":"Zentraa","pref":"Initiator","alt":null,"tier":"league","team":"Qoçular","kd":0.99,"aim":76,"sense":83,"teamwork":67},{"name":"Chron","pref":"Sentinel","alt":null,"tier":"league","team":"Revengers","kd":1.01,"aim":75,"sense":64,"teamwork":57},{"name":"zantexsa","pref":"Controller","alt":null,"tier":"league","team":"DPR","kd":1.11,"aim":65,"sense":72,"teamwork":79},{"name":"Schaven","pref":"Sentinel","alt":null,"tier":"league","team":"MYTH B","kd":0.98,"aim":73,"sense":70,"teamwork":47},{"name":"JaCos7a","pref":"Initiator","alt":null,"tier":"league","team":"Shaman","kd":1.03,"aim":73,"sense":71,"teamwork":68},{"name":"jotaaa","pref":"Sentinel","alt":null,"tier":"league","team":"Low9","kd":0.97,"aim":64,"sense":59,"teamwork":56},{"name":"t7raLL","pref":"Duelist","alt":null,"tier":"league","team":"Protocol 9","kd":1.07,"aim":92,"sense":91,"teamwork":53},{"name":"Raiden7","pref":"Sentinel","alt":null,"tier":"league","team":"ICY Flame","kd":0.99,"aim":72,"sense":79,"teamwork":54},{"name":"uzzy","pref":"Controller","alt":null,"tier":"league","team":"Trayb","kd":1.16,"aim":91,"sense":87,"teamwork":92},{"name":"Misugi","pref":"Controller","alt":null,"tier":"league","team":"Elite","kd":1.02,"aim":82,"sense":88,"teamwork":81},{"name":"Shar0n9","pref":"Initiator","alt":null,"tier":"league","team":"DPR","kd":1.08,"aim":61,"sense":67,"teamwork":71},{"name":"Haiseeee","pref":"Sentinel","alt":null,"tier":"league","team":"ICY Flame","kd":0.95,"aim":68,"sense":81,"teamwork":63},{"name":"Lazer","pref":"Duelist","alt":null,"tier":"league","team":"Unique 5","kd":1.04,"aim":87,"sense":89,"teamwork":64},{"name":"Jaqen","pref":"Duelist","alt":null,"tier":"league","team":"Protocol 9","kd":1.18,"aim":94,"sense":91,"teamwork":86},{"name":"resad2k","pref":"Controller","alt":null,"tier":"league","team":"S4W","kd":1.13,"aim":66,"sense":82,"teamwork":91},{"name":"rufichilling","pref":"Controller","alt":null,"tier":"league","team":"Zero Call","kd":0.96,"aim":57,"sense":51,"teamwork":85},{"name":"SaL7aTi0N","pref":"Initiator","alt":null,"tier":"league","team":"MYTH B","kd":0.95,"aim":66,"sense":63,"teamwork":72},{"name":"m1racle","pref":"Sentinel","alt":null,"tier":"league","team":"MYTH","kd":1.06,"aim":74,"sense":67,"teamwork":65},{"name":"kr0nos","pref":"Controller","alt":null,"tier":"league","team":"MYTH","kd":1.06,"aim":63,"sense":61,"teamwork":94},{"name":"tunjjaay","pref":"Controller","alt":null,"tier":"league","team":"Zero Call","kd":0.97,"aim":63,"sense":62,"teamwork":83},{"name":"Husak","pref":"Sentinel","alt":null,"tier":"league","team":"MYTH B","kd":0.96,"aim":62,"sense":68,"teamwork":59},{"name":"jaffrsai","pref":"Duelist","alt":null,"tier":"league","team":"Qoçular","kd":0.88,"aim":62,"sense":63,"teamwork":67},{"name":"syp9R","pref":"Sentinel","alt":null,"tier":"league","team":"Prime Esports","kd":0.95,"aim":60,"sense":76,"teamwork":53},{"name":"m0hg","pref":"Controller","alt":null,"tier":"league","team":"Qoçular","kd":0.94,"aim":60,"sense":58,"teamwork":93},{"name":"Shaggy","pref":"Controller","alt":null,"tier":"league","team":"Unique 5","kd":1.07,"aim":79,"sense":77,"teamwork":87},{"name":"espinoza","pref":"Duelist","alt":null,"tier":"league","team":"Unique 5","kd":0.98,"aim":79,"sense":72,"teamwork":52},{"name":"yunar","pref":"Initiator","alt":null,"tier":"league","team":"Trayb","kd":0.94,"aim":54,"sense":53,"teamwork":71},{"name":"Fushiguro","pref":"Sentinel","alt":null,"tier":"league","team":"ICY Flame","kd":0.92,"aim":54,"sense":52,"teamwork":62},{"name":"Celestian","pref":"Sentinel","alt":null,"tier":"league","team":"MYTH B","kd":0.92,"aim":64,"sense":67,"teamwork":57},{"name":"yuizzy","pref":"Controller","alt":null,"tier":"league","team":"Elite","kd":1.1,"aim":85,"sense":92,"teamwork":81},{"name":"Sekoala","pref":"Sentinel","alt":null,"tier":"league","team":"ICY Flame","kd":0.9,"aim":52,"sense":56,"teamwork":49},{"name":"imnvmusa","pref":"Sentinel","alt":null,"tier":"league","team":"Prime Esports","kd":0.93,"aim":52,"sense":61,"teamwork":47},{"name":"DarknessX","pref":"Controller","alt":null,"tier":"league","team":"Unique 5","kd":0.98,"aim":73,"sense":72,"teamwork":94},{"name":"i touch grass","pref":"Sentinel","alt":null,"tier":"league","team":"ICY Flame","kd":0.91,"aim":52,"sense":58,"teamwork":55},{"name":"Fara","pref":"Controller","alt":null,"tier":"league","team":"S4W","kd":1.25,"aim":61,"sense":74,"teamwork":89},{"name":"orw7zz","pref":"Sentinel","alt":null,"tier":"league","team":"Zero Call","kd":0.93,"aim":58,"sense":46,"teamwork":56},{"name":"TheRealRamin","pref":"Initiator","alt":null,"tier":"league","team":"Qoçular","kd":0.88,"aim":49,"sense":53,"teamwork":72},{"name":"sanri","pref":"Controller","alt":null,"tier":"league","team":"Protocol 9","kd":1.01,"aim":82,"sense":78,"teamwork":77},{"name":"Carabin","pref":"Controller","alt":null,"tier":"league","team":"Revengers","kd":0.89,"aim":55,"sense":54,"teamwork":78},{"name":"Optimus Prime","pref":"Controller","alt":null,"tier":"league","team":"Shaman","kd":0.96,"aim":67,"sense":66,"teamwork":78},{"name":"Admiral","pref":"Sentinel","alt":null,"tier":"league","team":"Shaman","kd":1.06,"aim":77,"sense":76,"teamwork":64},{"name":"Seedorf","pref":"Initiator","alt":null,"tier":"league","team":"Shaman","kd":1.14,"aim":91,"sense":85,"teamwork":73},{"name":"twenty one","pref":"Controller","alt":null,"tier":"league","team":"Unique 5","kd":1.03,"aim":75,"sense":68,"teamwork":77},{"name":"pressure","pref":"Initiator","alt":null,"tier":"league","team":"Elite","kd":1,"aim":59,"sense":56,"teamwork":67},{"name":"mFear","pref":"Initiator","alt":null,"tier":"league","team":"Elite","kd":0.97,"aim":49,"sense":51,"teamwork":70},{"name":"Legitov","pref":"Controller","alt":null,"tier":"league","team":"Protocol 9","kd":0.99,"aim":71,"sense":77,"teamwork":89},{"name":"molly","pref":"Duelist","alt":null,"tier":"league","team":"Elite","kd":1.02,"aim":95,"sense":46,"teamwork":90},{"name":"Ghoster","pref":"Initiator","alt":null,"tier":"league","team":"MYTH B","kd":0.89,"aim":55,"sense":54,"teamwork":74},{"name":"Mr Negative","pref":"Duelist","alt":null,"tier":"league","team":"Shaman","kd":1.07,"aim":81,"sense":86,"teamwork":61},{"name":"caesar","pref":"Controller","alt":null,"tier":"league","team":"Qoçular","kd":0.9,"aim":51,"sense":60,"teamwork":82},{"name":"r9pys","pref":"Sentinel","alt":null,"tier":"league","team":"Prime Esports","kd":0.93,"aim":51,"sense":66,"teamwork":58},{"name":"Micheal Scofield","pref":"Sentinel","alt":null,"tier":"league","team":"Prime Esports","kd":0.86,"aim":48,"sense":49,"teamwork":48},{"name":"Starboy","pref":"Controller","alt":null,"tier":"league","team":"DPR","kd":1.12,"aim":69,"sense":81,"teamwork":77},{"name":"Jeasy","pref":"Initiator","alt":null,"tier":"league","team":"MYTH","kd":1.05,"aim":86,"sense":80,"teamwork":70},{"name":"La Tormenta","pref":"Controller","alt":null,"tier":"league","team":"Protocol 9","kd":1.04,"aim":69,"sense":78,"teamwork":84},{"name":"aim yok","pref":"Sentinel","alt":null,"tier":"league","team":"Unique 5","kd":1,"aim":65,"sense":59,"teamwork":61},{"name":"Swift","pref":"Duelist","alt":null,"tier":"league","team":"DPR","kd":1.19,"aim":83,"sense":85,"teamwork":81},{"name":"PyrOnyx","pref":"Sentinel","alt":null,"tier":"league","team":"MYTH B","kd":0.85,"aim":50,"sense":54,"teamwork":48},{"name":"AlyV","pref":"Controller","alt":null,"tier":"league","team":"Prime Esports","kd":0.91,"aim":48,"sense":56,"teamwork":84},{"name":"twoin","pref":"Sentinel","alt":null,"tier":"league","team":"Shaman","kd":0.92,"aim":53,"sense":52,"teamwork":51},{"name":"NAXCIVAN","pref":"Sentinel","alt":null,"tier":"league","team":"Prime Esports","kd":0.82,"aim":47,"sense":48,"teamwork":46},{"name":"abovv","pref":"Controller","alt":null,"tier":"league","team":"Zero Call","kd":1.02,"aim":67,"sense":74,"teamwork":77},{"name":"shck","pref":"Controller","alt":null,"tier":"league","team":"Trayb","kd":0.86,"aim":56,"sense":50,"teamwork":83},{"name":"Chio","pref":"Controller","alt":null,"tier":"league","team":"DPR","kd":1.21,"aim":94,"sense":95,"teamwork":86},{"name":"would","pref":"Controller","alt":null,"tier":"league","team":"Protocol 9","kd":0.79,"aim":47,"sense":87,"teamwork":92},{"name":"Fear","pref":"Controller","alt":null,"tier":"league","team":"Revengers","kd":0.84,"aim":89,"sense":45,"teamwork":95},{"name":"Hooligan","pref":"Controller","alt":null,"tier":"league","team":"Qoçular","kd":0.87,"aim":76,"sense":49,"teamwork":93},{"name":"urdaddy","pref":"Sentinel","alt":null,"tier":"league","team":"Unique 5","kd":1,"aim":69,"sense":59,"teamwork":49},{"name":"Lieutenant","pref":"Controller","alt":null,"tier":"league","team":"Elite","kd":0.75,"aim":46,"sense":47,"teamwork":81},{"name":"Pulvis","pref":"Sentinel","alt":null,"tier":"league","team":"Prime Esports","kd":0.94,"aim":56,"sense":65,"teamwork":46},{"name":"good random","pref":"Sentinel","alt":null,"tier":"league","team":"S4W","kd":1,"aim":46,"sense":47,"teamwork":46},{"name":"Cyne","pref":"Sentinel","alt":null,"tier":"league","team":"MYTH B","kd":0.81,"aim":46,"sense":48,"teamwork":49}];
+
+// Dostlar (şəxsi istifadə). "very" = çox yaxşı, "good" = yaxşı. Theo emekli olduğu üçün daxil deyil.
+const FRIENDS = [{"name":"Namazov","pref":"Initiator","alt":null,"tier":"very","team":"HYPE+"},{"name":"Bezwans","pref":"Duelist","alt":"Sentinel","tier":"very","team":"HYPE+"},{"name":"Bender","pref":"Duelist","alt":null,"tier":"very","team":"HYPE+"},{"name":"Reshad2K","pref":"Controller","alt":null,"tier":"very","team":"HYPE+"},{"name":"Theo","pref":"Initiator","alt":null,"tier":"very","retired":true},{"name":"Alsejk","pref":"Duelist","alt":"Initiator","tier":"very"},{"name":"Noir","pref":"Duelist","alt":null,"tier":"very"},{"name":"Ozby","pref":"Duelist","alt":null,"tier":"very"},{"name":"Kairetsu","pref":"Sentinel","alt":null,"tier":"very","team":"HYPE+"},{"name":"Noscrubs","pref":"Duelist","alt":null,"tier":"very"},{"name":"Ex1t","pref":"Sentinel","alt":null,"tier":"good"},{"name":"Kranos","pref":"Initiator","alt":null,"tier":"good"},{"name":"Glory","pref":"Controller","alt":null,"tier":"good"},{"name":"Mruzl","pref":"Initiator","alt":"Sentinel","tier":"good"}];
+
+// Bütün komandalar (18). Hər komandada 5 oyunçu olmalıdır ki, seçilə bilsin.
+const TEAM_NAMES = ["DPR","Trayb","Low9","MYTH","Zero Call","Revengers","Protocol 9","Qoçular","MYTH B","Shaman","ICY Flame","Elite","Unique 5","Prime Esports","HYPE+","SHIFT WALKERS"];
+
+// Qələbə şansı yalnız komandaların orta K/D fərqinə görə hesablanır. 1.2 vs 1.0 ≈ 99.9%
+const KD_STEEPNESS = 34.5;
+const winChance = (kdA, kdB) => 1/(1+Math.exp(-KD_STEEPNESS*(kdA-kdB)));
+const SAVE_KEY = "tem_save_v11";
+
+// ===== Köməkçilər =====
+const $ = id => document.getElementById(id);
+const rnd = (a,b) => Math.floor(Math.random()*(b-a+1))+a;
+const avg = (ps,f) => ps.length ? ps.reduce((s,p)=>s+f(p),0)/ps.length : 0;
+const clamp = (v,a,b) => Math.min(b, Math.max(a,v));
+const money = n => "$" + Math.round(n).toLocaleString("en-US");
+const initials = n => n.split(" ").map(w=>w[0]).join("");
+const agentsOf = role => AGENTS.map((a,i)=>i).filter(i=>AGENTS[i].role===role);
+const jitter = () => 0.8 + Math.random()*0.4;
+const roleLabel = p => p.alt ? `${p.pref} / ${p.alt}` : p.pref;
+const f2 = n => n.toFixed(2);
+const fitClass = f => f>=80 ? "good" : f>=60 ? "mid" : "bad";
+
+const avgRating = p => p.st.m ? p.st.rs/p.st.m : 0;
+const playerKd = p => p.kdBase ?? (p.st.d ? p.st.k/p.st.d : 1.0);
+// Qiymət: ən zəif (K/D 0.75) oyunçu ≈ $1.5k, ən güclü (K/D 1.25+) $60k-dır. Ən zəif 5 oyunçu başlanğıc $20k-ya sığır.
+const priceOf = v => Math.max(1500, Math.round(60000 * Math.pow(clamp((v-0.75)/0.5, 0, 1), 2.2)));
+const price = p => Math.min(60000, priceOf(p.kdBase != null ? p.kdBase : avgRating(p)));
+const sellPrice = p => Math.round(price(p)*0.6);
+const wages = ps => ps.reduce((s,p)=>s+price(p)*0.04, 0);
+
+let state = null;
+
+// ===== Oyunçular və komandalar =====
+function leaguePlayer(f){
+  return {name:f.name, pref:f.pref, alt:null, assignRole:f.pref, agent:agentsOf(f.pref)[0],
+          aim:f.aim, sense:f.sense, teamwork:f.teamwork, form:rnd(65,80),
+          kdBase:f.kd, srcTeam:f.team, team:null, reserve:false,
+          st:{m:10, rounds:240, k:Math.round(f.kd*150), d:150, rs:10*f.kd}, last:f.kd};
+}
+function friendPlayer(f){
+  const [lo,hi] = f.tier === "very" ? [75,90] : [60,75];
+  const p = {name:f.name, pref:f.pref, alt:f.alt, assignRole:f.pref, agent:agentsOf(f.pref)[0],
+             aim:rnd(lo,hi), sense:rnd(lo,hi), teamwork:rnd(lo,hi), form:rnd(65,80),
+             kdBase:null, srcTeam:null, team:f.team||null, reserve:false, st:{m:0, rounds:0, k:0, d:0, rs:0}, last:null};
+  for (let i=0; i<10; i++) addStats(p, perfMatch(p, 24, 80));
+  return p;
+}
+function fitOf(p){
+  if (p.agent == null) return 0;
+  const ag = AGENTS[p.agent];
+  const roleMatch = (p.assignRole === p.pref || p.assignRole === p.alt) ? 1 : 0.6;
+  const agentMatch = ag.role === p.assignRole ? 1 : 0.5;
+  const statScore = p[ag.key] / 100;
+  return Math.round(clamp((roleMatch*agentMatch*0.5 + statScore*0.5)*100, 0, 100));
+}
+function perfMatch(p, rounds, fitVal){
+  const skill = (p.aim*0.5 + p.sense*0.3 + p.teamwork*0.2)/100 * (0.7 + 0.3*fitVal/100) * (0.9 + p.form/1000);
+  const kills = Math.max(0, Math.round(rounds * (0.5 + 0.4*skill) * jitter()));
+  const deaths = Math.max(1, Math.round(rounds * (0.75 - 0.25*skill) * jitter()));
+  const kpr = kills/rounds, dpr = deaths/rounds;
+  const rating = +(0.5 + 0.5*kpr/0.67 + 0.5*(1 - dpr/0.67)).toFixed(2);
+  return {rounds, kills, deaths, rating};
+}
+function addStats(p, r){
+  p.st.m++; p.st.rounds += r.rounds; p.st.k += r.kills; p.st.d += r.deaths; p.st.rs += r.rating;
+  p.last = r.rating;
+}
+
+function roster(){ return state.myTeam ? state.players.filter(p => p.team === state.myTeam) : []; }
+function teamPlayers(tn){ return state.players.filter(p => p.team === tn); }
+function starters(tn){ return teamPlayers(tn).filter(p => !p.reserve); }
+function myStarters(){ return roster().filter(p => !p.reserve); }
+function teamKd(tn){ const ps = starters(tn); return ps.length ? avg(ps, playerKd) : 1.0; }
+
+function newGame(){
+  const players = LEAGUE.map(leaguePlayer);
+  FRIENDS.filter(f => !f.retired).forEach(f => players.push(friendPlayer(f)));
+  // Hər liqa oyunçusu öz komandasına gedir. K/D-yə görə ən yaxşı 5-i əsasdır, qalanları yedəkdir.
+  TEAM_NAMES.forEach(tn => {
+    players.filter(p => p.srcTeam && p.srcTeam.toUpperCase() === tn.toUpperCase())
+           .sort((a,b) => b.kdBase - a.kdBase)
+           .forEach((p,i) => { p.team = tn; p.reserve = i >= 5; });
+  });
+  // Əl ilə köçürmələr (oyunçu -> komanda). Təsirə düşən komandalar yenidən əsas/yedək bölünür.
+  const MOVES = {"Ex1t": "Revengers", "Alsejk": "Trayb", "Ozby": "Trayb", "Aidd": "MYTH"};
+  const touched = new Set();
+  Object.entries(MOVES).forEach(([name, tn]) => {
+    const p = players.find(x => x.name === name);
+    if (!p) return;
+    if (p.team) touched.add(p.team);
+    p.team = tn; touched.add(tn);
+  });
+  touched.forEach(tn => {
+    players.filter(p => p.team === tn)
+           .sort((a,b) => playerKd(b) - playerKd(a))
+           .forEach((p,i) => { p.reserve = i >= 5; });
+  });
+  players.forEach(ensureRoleFit);
+  state = {
+    budget: 20000, myTeam: null, players, week: 0,
+    tactics: {}, notes: {}, coach: [], defense: {},
+    table: TEAM_NAMES.map(n => ({name:n, w:0, l:0, pts:0})),
+    logText: "Hələ matç oynanmayıb."
+  };
+  save(); render();
+}
+function save(){ try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch(e){} }
+function load(){
+  try { state = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch(e){ state = null; }
+  if (!state) return newGame();
+  state.coach = state.coach || []; state.defense = state.defense || {};
+  state.players.forEach(ensureRoleFit); save();
+  render();
+}
+function msg(t){ $("msg").textContent = t; }
+
+// ===== Cədvəl =====
+function makeSchedule(){
+  const arr = TEAM_NAMES.slice(), n = arr.length, rounds = [];
+  for (let r = 0; r < n-1; r++){
+    const pairs = [];
+    for (let i = 0; i < n/2; i++) pairs.push([arr[i], arr[n-1-i]]);
+    rounds.push(pairs);
+    arr.splice(1, 0, arr.pop());
+  }
+  return rounds;
+}
+const SCHEDULE = makeSchedule();
+function myMatchThisWeek(){
+  if (!state.myTeam) return null;
+  const round = SCHEDULE[state.week];
+  if (!round) return null;
+  const pair = round.find(p => p.includes(state.myTeam));
+  return pair ? pair.find(x => x !== state.myTeam) : null;
+}
+function row(name){ return state.table.find(r => r.name === name); }
+function rec(name, key){ const r = row(name); if (key === "w"){ r.w++; r.pts += 3; } else r.l++; }
+
+// ===== Komanda seçimi və transfer =====
+function chooseTeam(tn){
+  if (state.week > 0) return msg("Mövsüm başlayıb, komanda dəyişmək olmur.");
+  if (starters(tn).length < 5) return msg("Bu komandada hələ 5 əsas oyunçu yoxdur.");
+  state.myTeam = tn; msg(`${tn} komandası seçildi.`); save(); render();
+}
+function sell(i){
+  const p = state.players[i];
+  if (p.team !== state.myTeam) return;
+  state.budget += sellPrice(p);
+  p.team = null;
+  msg(`${p.name} satıldı.`); save(); render();
+}
+function buy(i){
+  const p = state.players[i];
+  if (!state.myTeam || p.team === state.myTeam) return;
+  const startersNow = myStarters().length;
+  if (state.budget < price(p)) return msg("Büdcə çatmır.");
+  state.budget -= price(p);
+  const from = p.team;
+  p.team = state.myTeam;
+  p.reserve = startersNow >= 5;
+  msg(`${p.name} komandaya qoşuldu${from ? ` (${from}-dən)` : ""}.`); save(); render();
+}
+
+function toggleReserve(i){
+  const p = state.players[i];
+  if (p.team !== state.myTeam) return;
+  if (p.reserve){
+    if (myStarters().length >= 5) return msg("Əsas heyət artıqdır (5). Əvvəl bir əsas oyunçunu yedəyə salın.");
+    p.reserve = false;
+  } else {
+    p.reserve = true;
+  }
+  save(); render();
+}
+
+// ===== Rol və agent =====
+function setRole(i, role){ state.players[i].assignRole = role; save(); render(); }
+function setAgent(i, idx){ state.players[i].agent = +idx; save(); render(); }
+
+// ===== Matç =====
+// ===== Assistant Coach =====
+function coachSend(text, kind){
+  state.coach = state.coach || [];
+  state.coach.unshift({w: state.week, kind: kind || "info", text, read: false});
+  if (state.coach.length > 200) state.coach.length = 200;
+}
+// Rol uyğunluğu (0-100). Dəyərlər oyunçu yaranarkən bir dəfə təyin olunur və saxlanılır.
+function makeRoleFit(pref, alt){
+  const listed = [pref, alt].filter(Boolean);
+  const has = r => listed.includes(r);
+  const f = {Duelist:0, Initiator:0, Controller:0, Sentinel:0};
+  if (has("Initiator") && has("Controller")) { f.Initiator = 100; f.Controller = 100; }
+  else if (has("Duelist")) { f.Sentinel = Math.random() < 0.5 ? 50 : 0; }
+  else if (has("Initiator") && !has("Sentinel")) { f.Controller = rnd(35,75); f.Sentinel = 10; }
+  else if (has("Controller") && !has("Sentinel")) { f.Initiator = rnd(35,75); f.Sentinel = 10; }
+  else if (has("Sentinel") && listed.length === 1) { f.Controller = 10; f.Initiator = 10; f.Duelist = rnd(0,100); }
+  else { ROLES.forEach(r => { if (!listed.includes(r)) f[r] = 10; }); }
+  listed.forEach(r => f[r] = 100);
+  return f;
+}
+function ensureRoleFit(p){ if (!p.roleFit) p.roleFit = makeRoleFit(p.pref, p.alt); }
+function roleFitOf(p){ ensureRoleFit(p); return p.roleFit[p.assignRole] ?? 0; }
+
+// Hücum taktikası: oyunçuların başlanğıc lövhəsindəki yerinə görə
+function zoneOfPoint(mi, q){
+  const z = MAPS[mi].place.attack.find(r => inRect(q.x, q.y, r));
+  if (!z) return "Digər";
+  if (z.name.includes("Mid")) return "Mid";
+  if (z.name.startsWith("A")) return "A";
+  if (z.name.startsWith("B")) return "B";
+  return "Digər";
+}
+function attackTactic(mi){
+  const t = curT(mi), cnt = {A:0, B:0, Mid:0, "Digər":0};
+  myStarters().forEach((p,i) => { const q = t.pos[i] || defaultPos(mi)[i]; cnt[zoneOfPoint(mi,q)]++; });
+  if (cnt.A === 4 && cnt.Mid === 1) return {name:"Execute", win:0.85, cnt};
+  if (cnt.A === 2 && cnt.Mid === 1 && cnt.B === 2) return {name:"Default", win:0.70, cnt};
+  if (cnt.Mid === 3 && cnt.A === 1 && cnt.B === 1) return {name:"Mid default", win:0.65, cnt};
+  return {name:"Digər", win:0.45, cnt};
+}
+// Müdafiə yoxlaması: oyunçuların lövhədə Defans tərəfindəki yeri
+function defZoneOfPoint(mi, q){
+  const m = MAPS[mi];
+  const site = m.sites.find(x => inRect(q.x, q.y, x));
+  if (site) return site.name;
+  if (m.mid.some(r => inRect(q.x, q.y, r))) return "Mid";
+  return "Rot";
+}
+function defenseCheck(mi){
+  const t = curT(mi), zs = {A:[], B:[], Mid:[], Rot:[]};
+  myStarters().forEach((p,i) => { const q = t.dpos[i] || defaultDefPos(mi)[i]; zs[defZoneOfPoint(mi,q)].push(p); });
+  const notes = []; let penalty = 0;
+  ["A","B"].forEach(s => {
+    const list = zs[s], label = "Sayt " + s;
+    if (list.length === 0) notes.push(label + " boşdur, komanda o siteı qoruya bilmir.");
+    if (list.length === 1 && list[0].assignRole !== "Controller"){
+      penalty += 0.10;
+      notes.push(label + "-da tək qalan " + list[0].name + " controller deyil. Sitedə tək yalnız controller qala bilər.");
+    }
+  });
+  return {penalty, notes, midEmpty: zs.Mid.length === 0};
+}
+// Əsas heyət 5-dən azdırsa: əvvəl yedəkdən, yoxdursa büdcə çatdığı qədər azad oyunçu alınır
+function refillTeam(){
+  while (myStarters().length < 5){
+    const res = roster().filter(p => p.reserve).sort((a,b) => playerKd(b) - playerKd(a));
+    if (res.length){ res[0].reserve = false; coachSend(`${res[0].name} yedəkdən əsas heyətə keçdi.`); continue; }
+    const cands = state.players.filter(p => p.team === null && price(p) <= state.budget).sort((a,b) => playerKd(b) - playerKd(a));
+    if (!cands.length){
+      coachSend(`Yedək yoxdur və büdcə (${money(state.budget)}) yeni oyunçu almağa çatmır. Komanda ${myStarters().length}/5 ilə qalır.`, "warn");
+      return;
+    }
+    const p = cands[0];
+    state.budget -= price(p); p.team = state.myTeam; p.reserve = false;
+    coachSend(`${p.name} azad oyunçu kimi komandaya alındı (${money(price(p))}).`);
+  }
+}
+function playMatch(prob, map, tacName){
+  const won = Math.random() < prob;
+  const loser = rnd(0, 11);
+  const sc = won ? [13, loser] : [loser, 13];
+  const log = [`Xəritə: ${map.name} | Hücum taktikası: ${tacName} | Qələbə ehtimalı: ${Math.round(prob*100)}%`, `Final: ${sc[0]}-${sc[1]}`];
+  return {won, score: sc, log};
+}
+function playWeek(){
+  if (!state.myTeam) return msg("Əvvəl komanda seçin.");
+  if (myStarters().length < 5) return msg("Matç üçün 5 əsas oyunçu lazımdır.");
+  const oppName = myMatchThisWeek();
+  if (!oppName) return msg("Mövsüm bitib.");
+  const mi = +$("map").value, map = MAPS[mi], ros = myStarters();
+  const tac = attackTactic(mi);
+  const def = defenseCheck(mi);
+  const fitPen = ros.reduce((s,p) => s + 0.15 * Math.max(0, 50 - roleFitOf(p)) / 50, 0);
+  let pw = tac.win + (winChance(teamKd(state.myTeam), teamKd(oppName)) - 0.5) * 0.3 - fitPen - def.penalty;
+  if (def.midEmpty) pw *= 0.8;
+  pw = clamp(pw, 0.02, 0.98);
+
+  const res = playMatch(pw, map, tac.name);
+  const rounds = res.score[0] + res.score[1];
+  const perf = ros.map(p => ({p, r: perfMatch(p, rounds, fitOf(p))}));
+  perf.forEach(x => addStats(x.p, x.r));
+  const best = perf.reduce((b,x) => x.r.rating > b.r.rating ? x : b);
+
+  for (const [a, b] of SCHEDULE[state.week]){
+    if (a === state.myTeam || b === state.myTeam) continue;
+    const winner = Math.random() < winChance(teamKd(a), teamKd(b)) ? a : b;
+    const loser = winner === a ? b : a;
+    rec(winner, "w"); rec(loser, "l");
+  }
+  if (res.won){ rec(state.myTeam, "w"); rec(oppName, "l"); state.budget += 20000; }
+  else        { rec(state.myTeam, "l"); rec(oppName, "w"); state.budget += 5000; }
+  state.budget -= wages(ros);
+  ros.forEach(p => p.form = clamp(p.form + (res.won ? rnd(1,5) : -rnd(1,5)), 40, 100));
+  state.week++;
+
+  // Assistant Coach bildirişləri
+  if (tac.name === "Digər") coachSend("Coach belke taktikani deyisek", "tactic");
+  def.notes.forEach(n => coachSend(n, "defense"));
+  if (def.midEmpty) coachSend("Biz midde oyuncu saxladigimiz ucun lurk yedik ve roundlarin 1/5 ni uduzduq.", "lurk");
+  ros.forEach(p => {
+    if (roleFitOf(p) < 40){
+      p.lowStreak = (p.lowStreak || 0) + 1;
+      if (p.lowStreak === 5) coachSend(`${p.name} oyuncu xosbext deyil ve ayrilmaq isteyir`, "warn");
+      if (p.lowStreak >= 7){
+        p.team = null; p.reserve = false; p.lowStreak = 0;
+        coachSend(`${p.name} oyuncu komandadan ayrildi`, "leave");
+      }
+    } else p.lowStreak = 0;
+  });
+  refillTeam();
+
+  const lines = [
+    `Rəqib: ${oppName}`, ...res.log,
+    `Rol uyğunluğu cəriməsi: -${Math.round(fitPen*100)}% · müdafiə cəriməsi: -${Math.round(def.penalty*100)}%${def.midEmpty ? " · mid boşdur (×0.8)" : ""}`,
+    `Nəticə: ${res.won ? "QALİBİYYƏT" : "MƏĞLUBİYYƏT"} ${res.score[0]}-${res.score[1]}`,
+    "Oyunçular:",
+    ...perf.map(x => `  ${x.p.name}: ${x.r.kills}/${x.r.deaths} · reytinq ${x.r.rating.toFixed(2)}`),
+    `Ən yaxşı oyunçu: ${best.p.name} (${best.r.rating.toFixed(2)})`,
+    `Büdcə: ${money(state.budget)}`
+  ];
+  state.logText = lines.join("\n");
+  msg(""); save(); render();
+}
+
+// ===== Taktika lövhəsi =====
+const cv = $("board"), ctx = cv.getContext("2d");
+const W = cv.width, H = cv.height;
+let dragging = -1;
+
+function spread(zones){
+  const out = [];
+  for (let i = 0; i < 5; i++){
+    const z = zones[i % zones.length], slot = Math.floor(i / zones.length);
+    out.push({x: z.x + z.w*0.5, y: z.y + z.h*(slot % 2 ? 0.75 : 0.25)});
+  }
+  return out;
+}
+function defaultDefPos(mi){ return spread(MAPS[mi].place.defense); }
+function curT(mi){
+  const k = String(mi);
+  if (!state.tactics[k]) state.tactics[k] = {pos: defaultPos(mi), dpos: defaultDefPos(mi)};
+  const t = state.tactics[k];
+  if (!t.dpos || !t.dpos.every(q => allowedAt(mi, "defense", q))) t.dpos = defaultDefPos(mi);
+  if (!t.pos || !t.pos.every(q => allowedAt(mi, "attack", q))) t.pos = defaultPos(mi);
+  return t;
+}
+function defaultPos(mi){ return spread(MAPS[mi].place.attack); }
+function allowedAt(mi, side, q){ return MAPS[mi].place[side].some(z => inRect(q.x, q.y, z)); }
+function curSide(){ return $("side") && $("side").value === "defense" ? "defense" : "attack"; }
+function posArr(mi){ const t = curT(mi); return curSide() === "defense" ? t.dpos : t.pos; }
+function defPt(mi, i){ return curSide() === "defense" ? defaultDefPos(mi)[i] : defaultPos(mi)[i]; }
+const inRect = (x,y,r) => x >= r.x && x <= r.x+r.w && y >= r.y && y <= r.y+r.h;
+function blockedAt(mi, x, y){
+  if (x < 0 || x > 1 || y < 0 || y > 1) return true;
+  return !MAPS[mi].floor.some(r => inRect(x,y,r));
+}
+function pathClear(mi, x0,y0,x1,y1){
+  const steps = 16;
+  for (let i=1; i<=steps; i++){
+    const t = i/steps;
+    if (blockedAt(mi, x0+(x1-x0)*t, y0+(y1-y0)*t)) return false;
+  }
+  return true;
+}
+
+function drawBoard(){
+  const mi = +$("tmap").value, m = MAPS[mi], side = curSide();
+  const arr = posArr(mi);
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = "#5a6172"; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle = "#2e3646";
+  m.floor.forEach(r => ctx.fillRect(r.x*W, r.y*H, r.w*W, r.h*H));
+  ctx.fillStyle = "rgba(255,209,102,0.18)";
+  m.mid.forEach(r => ctx.fillRect(r.x*W, r.y*H, r.w*W, r.h*H));
+  const zone = (z, color, label) => {
+    ctx.fillStyle = color; ctx.fillRect(z.x*W, z.y*H, z.w*W, z.h*H);
+    ctx.fillStyle = "#e8e8ee"; ctx.font = "bold 13px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(label, (z.x+z.w/2)*W, Math.max(14, z.y*H - 6));
+  };
+  zone(m.attack,  "rgba(95,211,141,0.25)", "Hücum başlanğıcı");
+  zone(m.defense, "rgba(90,160,255,0.25)", "Müdafiə başlanğıcı");
+  (m.place[side] || []).forEach(z => { ctx.setLineDash([6,4]); ctx.strokeStyle = side === "defense" ? "#5aa0ff" : "#5fd38d"; ctx.lineWidth = 2; ctx.strokeRect(z.x*W, z.y*H, z.w*W, z.h*H); ctx.setLineDash([]); });
+  const mr = m.mid[0];
+  ctx.fillStyle = "#ffd166"; ctx.font = "bold 14px sans-serif"; ctx.textAlign = "left";
+  ctx.fillText("MID", mr.x*W + 6, mr.y*H + 16);
+  m.sites.forEach(s => {
+    ctx.strokeStyle = "#ff4655"; ctx.lineWidth = 3;
+    ctx.strokeRect(s.x*W, s.y*H, s.w*W, s.h*H);
+    ctx.fillStyle = "#ff4655"; ctx.font = "bold 18px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText("Sayt " + s.name, (s.x+s.w/2)*W, (s.y+s.h/2)*H + 6);
+  });
+  ctx.fillStyle = "#cfd3dc"; ctx.font = "14px sans-serif"; ctx.textAlign = "left";
+  (m.callouts || []).forEach(c => { ctx.fillStyle = "#e8e8ee"; ctx.font = "11px sans-serif"; ctx.textAlign = "center"; ctx.fillText(c.n, c.x*W, c.y*H); });
+  ctx.fillStyle = "#e8e8ee"; ctx.textAlign = "left";
+  ctx.fillText(m.name + (side === "defense" ? " · Müdafiə" : " · Hücum"), 10, H-10);
+  myStarters().forEach((p,i) => {
+    const q = arr[i] || defPt(mi, i);
+    ctx.beginPath();
+    ctx.arc(q.x*W, q.y*H, 14, 0, Math.PI*2);
+    ctx.fillStyle = side === "defense" ? "#5aa0ff" : `hsl(${i*70},70%,55%)`;
+    ctx.fill();
+    ctx.fillStyle = "#101216"; ctx.font = "bold 11px sans-serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(initials(p.name), q.x*W, q.y*H);
+    ctx.textBaseline = "alphabetic";
+  });
+  ctx.textAlign = "start";
+}
+function canvasPos(e){
+  const r = cv.getBoundingClientRect();
+  return {x:(e.clientX-r.left)/r.width, y:(e.clientY-r.top)/r.height};
+}
+cv.addEventListener("pointerdown", e => {
+  const mi = +$("tmap").value, arr = posArr(mi), q = canvasPos(e);
+  let best = -1, bd = 0.04;
+  myStarters().forEach((p,i) => {
+    const pt = arr[i] || defPt(mi, i);
+    const d = Math.hypot(pt.x-q.x, pt.y-q.y);
+    if (d < bd){ bd = d; best = i; }
+  });
+  dragging = best;
+  if (best >= 0) cv.setPointerCapture(e.pointerId);
+});
+cv.addEventListener("pointermove", e => {
+  if (dragging < 0) return;
+  const mi = +$("tmap").value, arr = posArr(mi), q = canvasPos(e);
+  const cur = arr[dragging] || defPt(mi, dragging);
+  const nx = clamp(q.x,0,1), ny = clamp(q.y,0,1);
+  if (allowedAt(mi, curSide(), {x:nx, y:ny}) && pathClear(mi, cur.x, cur.y, nx, ny)){
+    arr[dragging] = {x:nx, y:ny};
+    drawBoard();
+  }
+});
+cv.addEventListener("pointerup", () => { if (dragging >= 0){ dragging = -1; save(); } });
+
+// ===== Render =====
+function renderTeam(){
+  $("pickCard").style.display = state.myTeam ? "none" : "block";
+  $("teamCard").style.display = state.myTeam ? "" : "none";
+  if (!state.myTeam){
+    $("pick").innerHTML = `<tr><th>Komanda</th><th>Əsas</th><th>Yedək</th><th>Orta K/D</th><th></th></tr>` +
+      TEAM_NAMES.map(tn => {
+        const st = starters(tn), res = teamPlayers(tn).length - st.length, ok = st.length >= 5;
+        return `<tr><td>${tn}</td><td>${st.length}/5</td><td>${res}</td><td>${st.length ? f2(avg(st, playerKd)) : "—"}</td>
+          <td>${ok ? `<button onclick="chooseTeam('${tn}')">Seç</button>` : `<span class="hint">oyunçu əlavə edilməlidir</span>`}</td></tr>`;
+      }).join("");
+    return;
+  }
+  $("myteamname").textContent = state.myTeam;
+  $("roster").innerHTML = `<tr><th>Oyunçu</th><th>Növ</th><th>Rol</th><th>Orta reytinq</th><th>K/D</th><th>Son matç</th><th>Forma</th><th></th></tr>` +
+    roster().map(p => {
+      const i = state.players.indexOf(p);
+      return `<tr><td>${p.name}</td><td>${p.reserve ? "Yedək" : "Əsas"}</td><td>${roleLabel(p)}</td><td>${f2(avgRating(p))}</td><td>${f2(playerKd(p))}</td>
+        <td>${p.last!=null ? f2(p.last) : "—"}</td><td>${p.form}</td>
+        <td><button class="alt" onclick="toggleReserve(${i})">${p.reserve ? "Əsasa al" : "Yedəyə sal"}</button>
+        <button class="alt" onclick="sell(${i})">Sat (${money(sellPrice(p))})</button></td></tr>`;
+    }).join("");
+  renderSearch();
+}
+function renderSearch(){
+  const q = $("search").value.trim().toLowerCase();
+  const rows = state.players.map((p,i) => ({p, i}))
+    .filter(x => x.p.team !== state.myTeam && x.p.name.toLowerCase().includes(q))
+    .sort((a,b) => playerKd(b.p) - playerKd(a.p))
+    .slice(0, 80);
+  $("results").innerHTML = `<tr><th>Oyunçu</th><th>Komanda</th><th>Rol</th><th>K/D</th><th>Qiymət</th><th></th></tr>` +
+    rows.map(({p,i}) => `<tr><td>${p.name}</td><td>${p.team || "Azad"}</td><td>${roleLabel(p)}</td>
+      <td>${f2(playerKd(p))}</td><td>${money(price(p))}</td>
+      <td><button onclick="buy(${i})">Al</button></td></tr>`).join("");
+}
+function renderDefPlan(){
+  const mi = +$("tmap").value;
+  const c = defenseCheck(mi);
+  const items = [...(c.midEmpty ? ["Mid boşdur: komanda roundların 1/5-ni uduzacaq."] : []), ...c.notes];
+  $("defcheck").innerHTML = items.length ? items.map(n => `<div class="coach warn">${n}</div>`).join("") : `<div class="coach">Müdafiə planı qaydalara uyğundur.</div>`;
+}
+function renderCoach(){
+  const list = state.coach || [];
+  const unread = list.filter(m => !m.read).length;
+  $("unread").textContent = unread ? `(${unread})` : "";
+  $("coachlist").innerHTML = list.length ? list.map(m => `<div class="coach ${m.kind}"><span class="hint">Həftə ${m.w}</span> ${m.text}</div>`).join("") : `<p class="hint">Hələ bildiriş yoxdur.</p>`;
+}
+function markCoachRead(){ (state.coach || []).forEach(m => m.read = true); save(); renderCoach(); }
+function renderAssign(){
+  const ros = roster();
+  const teamFit = myStarters().length === 5 ? Math.round(avg(myStarters(), fitOf)) : 0;
+  $("teamfit").innerHTML = ros.length ? `<span class="fit ${fitClass(teamFit)}">${teamFit}%</span>` : "Komanda seçilməyib";
+  $("assign").innerHTML = `<tr><th>Oyunçu</th><th>Öz rolu</th><th>Təyin olunan rol</th><th>Agent</th><th>Agent uyğunluğu</th><th>Rol uyğunluğu</th><th>Rol paylanması (D / I / C / S)</th></tr>` +
+    ros.map(p => {
+      const i = state.players.indexOf(p), f = fitOf(p), rf = roleFitOf(p), d = p.roleFit;
+      return `<tr><td>${p.name}</td><td>${roleLabel(p)}</td>
+        <td><select onchange="setRole(${i}, this.value)">${ROLES.map(r=>`<option ${r===p.assignRole?"selected":""}>${r}</option>`).join("")}</select></td>
+        <td><select onchange="setAgent(${i}, this.value)">${AGENTS.map((a,j)=>`<option value="${j}" ${j===p.agent?"selected":""}>${a.name} (${a.role})</option>`).join("")}</select></td>
+        <td class="fit ${fitClass(f)}">${f}%</td>
+        <td class="fit ${fitClass(rf)}">${rf}%</td>
+        <td class="hint">${d.Duelist} / ${d.Initiator} / ${d.Controller} / ${d.Sentinel}</td></tr>`;
+    }).join("");
+  $("agents").innerHTML = `<tr><th>Agent</th><th>Rol</th><th>Əsas stat</th><th>Bacarıq</th></tr>` +
+    AGENTS.map(a => `<tr><td>${a.name}</td><td>${a.role}</td><td>${a.key}</td><td>${a.ability}</td></tr>`).join("");
+}
+function renderTactics(){
+  if (!$("tmap").options.length){
+    $("tmap").innerHTML = MAPS.map((m,i)=>`<option value="${i}">${m.name}</option>`).join("");
+  }
+  const mi = +$("tmap").value, t = curT(mi);
+  $("note").value = state.notes[String(mi)] || "";
+  $("zonehint").textContent = "İcazəli yerlər (" + (curSide() === "defense" ? "Defans" : "Hücum") + "): " + MAPS[mi].place[curSide()].map(z => z.name).join(", ");
+  drawBoard();
+  renderDefPlan();
+}
+function renderMatch(){
+  const opp = myMatchThisWeek();
+  $("opp").textContent = !state.myTeam ? "Komanda seçilməyib" : (opp || "Mövsüm bitib");
+  if (!$("map").options.length){
+    $("map").innerHTML = MAPS.map((m,i)=>`<option value="${i}">${m.name}</option>`).join("");
+  }
+  $("play").disabled = !state.myTeam || !opp || myStarters().length < 5;
+  const tac = attackTactic(+$("map").value);
+  $("tacticInfo").textContent = `${tac.name} (baza ${Math.round(tac.win*100)}%)`;
+  const rows = [...state.table].sort((a,b) => b.pts-a.pts || b.w-a.w);
+  $("table").innerHTML = `<tr><th>Komanda</th><th>Q</th><th>M</th><th>Xal</th></tr>` +
+    rows.map(t => `<tr><td>${t.name === state.myTeam ? "<b>"+t.name+"</b>" : t.name}</td><td>${t.w}</td><td>${t.l}</td><td>${t.pts}</td></tr>`).join("");
+  $("log").textContent = state.logText;
+}
+function render(){
+  $("budget").textContent = money(state.budget);
+  $("week").textContent = `${state.week}/${SCHEDULE.length}`;
+  renderTeam(); renderAssign(); renderMatch(); renderCoach();
+  if (document.querySelector('.tab.active').dataset.tab === "tactics") renderTactics();
+}
+
+// ===== Hadisələr =====
+document.querySelectorAll(".tab").forEach(b => b.onclick = () => {
+  document.querySelectorAll(".tab").forEach(x => x.classList.toggle("active", x===b));
+  document.querySelectorAll(".panel").forEach(p => p.classList.toggle("active", p.id === "p-"+b.dataset.tab));
+  if (b.dataset.tab === "tactics") renderTactics();
+  if (b.dataset.tab === "coach") markCoachRead();
+});
+$("search").oninput = renderSearch;
+$("tmap").onchange = renderTactics;
+$("side").onchange = renderTactics;
+$("saveNote").onclick = () => { state.notes[$("tmap").value] = $("note").value; save(); msg("Qeyd saxlandı."); };
+$("resetPos").onclick = () => { const mi = +$("tmap").value, t = curT(mi); if (curSide() === "defense") t.dpos = defaultDefPos(mi); else t.pos = defaultPos(mi); save(); drawBoard(); };
+$("play").onclick = playWeek;
+$("map").onchange = renderMatch;
+$("reset").onclick = () => { if (confirm("Yeni oyun başlansın?")){ newGame(); msg("Yeni mövsüm. Komanda seçin."); } };
+
+load();
+</script>
+</body>
+</html>
